@@ -1,0 +1,361 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>좌석 선택</title>
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent-soft: #ccfbf1;
+      --danger: #b91c1c;
+      --seat: #dbeafe;
+      --seat-occupied: #9ca3af;
+      --line: #e5e7eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #e0f2fe, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(900px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+      display: grid;
+      gap: 12px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .left-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .back { text-decoration: none; color: #0f766e; font-weight: 700; }
+    h1 { font-size: 1.3rem; }
+    .auth-area { display: flex; gap: 8px; align-items: center; }
+    .auth-link, .auth-btn {
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      background: white;
+      cursor: pointer;
+    }
+    .auth-name { font-weight: 700; }
+    .legend {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      flex-wrap: wrap;
+    }
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 3px;
+      display: inline-block;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+    .seat-grid {
+      display: grid;
+      gap: 10px;
+    }
+    .seat {
+      border: 1px solid #93c5fd;
+      background: var(--seat);
+      border-radius: 10px;
+      height: 44px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .seat.mine {
+      background: #fef3c7;
+      border-color: #f59e0b;
+      color: #78350f;
+    }
+    .seat.occupied {
+      background: var(--seat-occupied);
+      border-color: var(--seat-occupied);
+      color: #f9fafb;
+      cursor: not-allowed;
+    }
+    .status {
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #f8fafc;
+      border: 1px solid var(--line);
+      color: var(--muted);
+      min-height: 42px;
+    }
+    .status.error {
+      color: var(--danger);
+      border-color: #fecaca;
+      background: #fff1f2;
+    }
+    .status.success {
+      color: #065f46;
+      border-color: #a7f3d0;
+      background: var(--accent-soft);
+    }
+    .mine-box {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .mine-value { font-weight: 700; color: var(--text); }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-backdrop.open { display: flex; }
+    .modal {
+      width: min(420px, 100%);
+      background: white;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      padding: 16px;
+      display: grid;
+      gap: 10px;
+    }
+    .captcha {
+      font-size: 1.6rem;
+      letter-spacing: 6px;
+      text-align: center;
+      padding: 8px;
+      border: 1px dashed #94a3b8;
+      border-radius: 8px;
+      background: #f8fafc;
+      font-weight: 800;
+      user-select: none;
+    }
+    .modal input {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+    }
+    .modal-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+    .btn {
+      border: none;
+      border-radius: 8px;
+      padding: 8px 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .btn.secondary { background: #e5e7eb; color: #111827; }
+    .btn.primary { background: #0f766e; color: #fff; }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="top">
+      <div class="left-top">
+        <a class="back" href="/">← 목록으로</a>
+        <h1 id="selectedEventTitle">좌석 선택</h1>
+      </div>
+      <div id="authArea" class="auth-area"></div>
+    </div>
+
+    <div class="legend">
+      <span><i class="dot" style="background:#dbeafe"></i>선택 가능</span>
+      <span><i class="dot" style="background:#fef3c7"></i>내 선택</span>
+      <span><i class="dot" style="background:#9ca3af"></i>이미 선택됨</span>
+    </div>
+
+    <div class="mine-box">내가 선택한 좌석: <span class="mine-value" id="mySeats">없음</span></div>
+    <div class="seat-grid" id="seatGrid"></div>
+    <div class="status" id="statusBox">좌석을 선택하세요.</div>
+  </main>
+
+  <div class="modal-backdrop" id="captchaModal">
+    <div class="modal">
+      <h2>자동보안문자 확인</h2>
+      <p>아래 숫자를 입력하고 확인을 누르면 좌석이 확정됩니다.</p>
+      <div class="captcha" id="captchaText"></div>
+      <input id="captchaInput" placeholder="보안문자 입력" />
+      <div class="modal-actions">
+        <button class="btn secondary" id="cancelCaptcha">취소</button>
+        <button class="btn primary" id="confirmCaptcha">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/auth.js"></script>
+  <script>
+    const seatGridEl = document.getElementById('seatGrid');
+    const statusEl = document.getElementById('statusBox');
+    const titleEl = document.getElementById('selectedEventTitle');
+    const mySeatsEl = document.getElementById('mySeats');
+
+    const modalEl = document.getElementById('captchaModal');
+    const captchaTextEl = document.getElementById('captchaText');
+    const captchaInputEl = document.getElementById('captchaInput');
+    const cancelCaptchaEl = document.getElementById('cancelCaptcha');
+    const confirmCaptchaEl = document.getElementById('confirmCaptcha');
+
+    const token = TicketingAuth.getToken();
+    const eventId = Number(new URLSearchParams(window.location.search).get('eventId'));
+
+    let pendingChallenge = null;
+
+    function setStatus(message, type = '') {
+      statusEl.className = `status ${type}`.trim();
+      statusEl.textContent = message;
+    }
+
+    async function authFetch(url, options = {}) {
+      const headers = { ...(options.headers || {}) };
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      return fetch(url, { ...options, headers });
+    }
+
+    function openCaptchaModal(challenge) {
+      pendingChallenge = challenge;
+      captchaTextEl.textContent = challenge.captcha_text;
+      captchaInputEl.value = '';
+      modalEl.classList.add('open');
+      captchaInputEl.focus();
+    }
+
+    function closeCaptchaModal() {
+      pendingChallenge = null;
+      modalEl.classList.remove('open');
+    }
+
+    async function loadSeats() {
+      const response = await authFetch(`/api/events/${eventId}/seats`);
+      if (response.status === 401) {
+        setStatus('로그인 후 좌석 선택이 가능합니다.', 'error');
+        seatGridEl.innerHTML = '';
+        return;
+      }
+
+      const data = await response.json();
+      if (!response.ok) {
+        setStatus(data.detail || '좌석 정보를 불러오지 못했습니다.', 'error');
+        return;
+      }
+
+      titleEl.textContent = `${data.event.name} (${data.event.seat_rows} x ${data.event.seat_cols} 좌석)`;
+      seatGridEl.style.gridTemplateColumns = `repeat(${data.event.seat_cols}, minmax(44px, 1fr))`;
+
+      if (!data.event.is_open) {
+        mySeatsEl.textContent = data.my_seats.length ? data.my_seats.join(', ') : '없음';
+        setStatus('아직 오픈 전입니다.', 'error');
+        seatGridEl.innerHTML = '';
+        return;
+      }
+
+      mySeatsEl.textContent = data.my_seats.length ? data.my_seats.join(', ') : '없음';
+
+      seatGridEl.innerHTML = '';
+      data.seats.forEach((seat) => {
+        const button = document.createElement('button');
+        button.className = 'seat';
+        button.textContent = seat.seat_id;
+
+        if (seat.status === 'occupied') {
+          button.classList.add('occupied');
+          button.addEventListener('click', () => {
+            setStatus(`${seat.seat_id} 좌석은 이미 다른 사용자가 선택했습니다.`, 'error');
+          });
+        } else if (seat.status === 'mine') {
+          button.classList.add('mine');
+          button.addEventListener('click', () => {
+            setStatus(`${seat.seat_id} 좌석은 내가 이미 선택한 좌석입니다.`, 'success');
+          });
+        } else {
+          button.addEventListener('click', async () => {
+            const challengeResponse = await authFetch(`/api/events/${eventId}/challenge`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ seat_id: seat.seat_id }),
+            });
+            const challengeBody = await challengeResponse.json();
+
+            if (!challengeResponse.ok) {
+              setStatus(challengeBody.detail || '보안문자를 생성할 수 없습니다.', 'error');
+              return;
+            }
+
+            openCaptchaModal(challengeBody);
+            setStatus(`${seat.seat_id} 좌석 선택 진행 중입니다. 보안문자를 입력하세요.`);
+          });
+        }
+
+        seatGridEl.appendChild(button);
+      });
+    }
+
+    cancelCaptchaEl.addEventListener('click', closeCaptchaModal);
+
+    confirmCaptchaEl.addEventListener('click', async () => {
+      if (!pendingChallenge) return;
+
+      const answer = captchaInputEl.value.trim();
+      if (!answer) {
+        setStatus('보안문자를 입력해 주세요.', 'error');
+        return;
+      }
+
+      const response = await authFetch(`/api/events/${eventId}/reserve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          challenge_id: pendingChallenge.challenge_id,
+          answer,
+        }),
+      });
+
+      const body = await response.json();
+      if (!response.ok) {
+        setStatus(body.detail || '좌석 확정에 실패했습니다.', 'error');
+        return;
+      }
+
+      closeCaptchaModal();
+      setStatus(body.message, 'success');
+      await loadSeats();
+    });
+
+    window.addEventListener('click', (event) => {
+      if (event.target === modalEl) closeCaptchaModal();
+    });
+
+    TicketingAuth.renderAuthArea('authArea');
+    loadSeats();
+  </script>
+</body>
+</html>

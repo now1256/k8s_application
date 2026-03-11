@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>티켓팅 열기</title>
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --line: #e5e7eb;
+      --accent: #0f766e;
+      --danger: #b91c1c;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #e0f2fe, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(560px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+      display: grid;
+      gap: 12px;
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .back { text-decoration: none; color: #0f766e; font-weight: 700; }
+    .auth-area { display: flex; gap: 8px; align-items: center; }
+    .auth-link, .auth-btn {
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      background: white;
+      cursor: pointer;
+    }
+    .auth-name { font-weight: 700; }
+    h1 { font-size: 1.4rem; }
+    p { color: var(--muted); }
+    form { display: grid; gap: 10px; }
+    label { display: grid; gap: 6px; font-size: 0.95rem; }
+    input {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 0.95rem;
+    }
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    #message { min-height: 20px; font-size: 0.9rem; color: var(--danger); }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="top">
+      <a class="back" href="/">← 목록으로</a>
+      <div id="authArea" class="auth-area"></div>
+    </div>
+
+    <h1>티켓팅 열기</h1>
+    <p>관리자 계정만 새 티켓팅을 생성할 수 있습니다.</p>
+
+    <form id="createEventForm">
+      <label>
+        티켓팅 제목
+        <input name="name" placeholder="예: 1회차 팬미팅 티켓팅" required />
+      </label>
+
+      <div class="row">
+        <label>
+          좌석 행(세로)
+          <input name="seat_rows" type="number" min="1" max="26" value="3" required />
+        </label>
+
+        <label>
+          좌석 열(가로)
+          <input name="seat_cols" type="number" min="1" max="20" value="4" required />
+        </label>
+      </div>
+
+      <label>
+        오픈 시간
+        <input name="open_at" type="datetime-local" required />
+      </label>
+
+      <button type="submit">티켓팅 생성</button>
+    </form>
+
+    <p id="message"></p>
+  </main>
+
+  <script src="/auth.js"></script>
+  <script>
+    const form = document.getElementById('createEventForm');
+    const messageEl = document.getElementById('message');
+
+    function setDefaultOpenTime() {
+      const input = form.elements.open_at;
+      const now = new Date();
+      now.setMinutes(now.getMinutes() + 1);
+      const pad = (value) => String(value).padStart(2, '0');
+      input.value = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    }
+
+    async function requireAdmin() {
+      await TicketingAuth.renderAuthArea('authArea');
+      const me = await TicketingAuth.fetchMe();
+      if (!me) {
+        messageEl.textContent = '로그인 후 이용해 주세요.';
+        form.style.display = 'none';
+        return false;
+      }
+      if (!me.is_admin) {
+        messageEl.textContent = '관리자 계정만 티켓팅을 열 수 있습니다.';
+        form.style.display = 'none';
+        return false;
+      }
+      return true;
+    }
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      messageEl.textContent = '';
+
+      const token = TicketingAuth.getToken();
+      if (!token) {
+        messageEl.textContent = '로그인 후 티켓팅을 열 수 있습니다.';
+        return;
+      }
+
+      const formData = new FormData(form);
+      const payload = {
+        name: String(formData.get('name') || '').trim(),
+        seat_rows: Number(formData.get('seat_rows')),
+        seat_cols: Number(formData.get('seat_cols')),
+        open_at: new Date(String(formData.get('open_at'))).toISOString(),
+      };
+
+      const response = await fetch('/api/events', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const body = await response.json();
+      if (!response.ok) {
+        messageEl.textContent = body.detail || '티켓팅 생성에 실패했습니다.';
+        return;
+      }
+
+      window.location.href = `/seat.html?eventId=${body.id}`;
+    });
+
+    (async () => {
+      const ok = await requireAdmin();
+      if (ok) {
+        setDefaultOpenTime();
+      }
+    })();
+  </script>
+</body>
+</html>

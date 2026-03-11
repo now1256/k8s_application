@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>티켓팅 목록</title>
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --card: #ffffff;
+      --text: #111827;
+      --muted: #6b7280;
+      --accent: #0f766e;
+      --disabled: #d1d5db;
+      --line: #e5e7eb;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top right, #e0f2fe, var(--bg) 45%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: grid;
+      place-items: center;
+    }
+    .card {
+      width: min(900px, 100%);
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 18px;
+      box-shadow: 0 8px 30px rgba(15, 23, 42, 0.06);
+    }
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+    .top-right { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .create-link {
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      background: #f8fafc;
+      font-weight: 700;
+      display: none;
+    }
+    .auth-area { display: flex; gap: 8px; align-items: center; }
+    .auth-link, .auth-btn {
+      border: 1px solid var(--line);
+      padding: 6px 10px;
+      border-radius: 8px;
+      text-decoration: none;
+      color: var(--text);
+      font-size: 0.9rem;
+      background: white;
+      cursor: pointer;
+    }
+    .auth-name { font-weight: 700; }
+    h1 { font-size: 1.5rem; }
+    .subtitle { color: var(--muted); margin-bottom: 16px; }
+    .event-list { display: grid; gap: 10px; }
+    .event-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+    }
+    .event-name { font-weight: 600; margin-bottom: 4px; }
+    .event-info { color: var(--muted); font-size: 0.92rem; }
+    .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .book-btn {
+      border: none;
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: var(--accent);
+      color: white;
+      cursor: pointer;
+      font-weight: 600;
+      min-width: 104px;
+      text-decoration: none;
+      text-align: center;
+      display: inline-block;
+    }
+    .book-btn[aria-disabled="true"] {
+      background: var(--disabled);
+      color: #374151;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+    .admin-link {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      text-decoration: none;
+      color: var(--text);
+      background: #f8fafc;
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+    .delete-btn {
+      border: 1px solid #fecaca;
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #b91c1c;
+      background: #fff1f2;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .empty {
+      border: 1px dashed var(--line);
+      border-radius: 10px;
+      padding: 14px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="top">
+      <h1>선착순 티켓팅</h1>
+      <div class="top-right">
+        <a class="create-link" id="createLink" href="/create-event.html">티켓팅 열기</a>
+        <div id="authArea" class="auth-area"></div>
+      </div>
+    </div>
+    <p class="subtitle">관리자 계정만 티켓팅을 열 수 있고, 생성자(또는 관리자)는 이벤트를 삭제할 수 있습니다.</p>
+    <div class="event-list" id="eventList"></div>
+  </main>
+
+  <script src="/auth.js"></script>
+  <script>
+    const eventListEl = document.getElementById('eventList');
+    const createLinkEl = document.getElementById('createLink');
+
+    function formatOpenAt(iso) {
+      return new Date(iso).toLocaleString('ko-KR', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    async function renderEvents(me) {
+      const response = await fetch('/api/events');
+      const events = await response.json();
+
+      eventListEl.innerHTML = '';
+      if (!Array.isArray(events) || events.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty';
+        empty.textContent = '아직 열린 티켓팅이 없습니다.';
+        eventListEl.appendChild(empty);
+        return;
+      }
+
+      events.forEach((event) => {
+        const item = document.createElement('article');
+        item.className = 'event-item';
+
+        const left = document.createElement('div');
+        left.innerHTML = `
+          <div class="event-name">${event.name}</div>
+          <div class="event-info">오픈: ${formatOpenAt(event.open_at)} · 좌석: ${event.seat_rows} x ${event.seat_cols}</div>
+        `;
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const seatLink = document.createElement('a');
+        seatLink.className = 'book-btn';
+        seatLink.textContent = event.is_open ? '좌석 선택' : '오픈 전';
+        if (event.is_open) {
+          seatLink.href = `/seat.html?eventId=${event.id}`;
+          seatLink.setAttribute('aria-disabled', 'false');
+        } else {
+          seatLink.href = '#';
+          seatLink.setAttribute('aria-disabled', 'true');
+        }
+        actions.appendChild(seatLink);
+
+        if (me && me.is_admin) {
+          const adminLink = document.createElement('a');
+          adminLink.className = 'admin-link';
+          adminLink.href = `/admin-event.html?eventId=${event.id}`;
+          adminLink.textContent = '좌석 선택 사용자 보기';
+          actions.appendChild(adminLink);
+        }
+
+        if (me && (me.is_admin || me.id === event.created_by)) {
+          const deleteButton = document.createElement('button');
+          deleteButton.className = 'delete-btn';
+          deleteButton.textContent = '이벤트 삭제';
+          deleteButton.addEventListener('click', async () => {
+            const ok = window.confirm(`"${event.name}" 이벤트를 삭제할까요?`);
+            if (!ok) return;
+
+            const token = TicketingAuth.getToken();
+            if (!token) return;
+
+            const deleteResponse = await fetch(`/api/events/${event.id}`, {
+              method: 'DELETE',
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            const body = await deleteResponse.json();
+            if (!deleteResponse.ok) {
+              window.alert(body.detail || '이벤트 삭제에 실패했습니다.');
+              return;
+            }
+            await renderEvents(me);
+          });
+          actions.appendChild(deleteButton);
+        }
+
+        item.append(left, actions);
+        eventListEl.appendChild(item);
+      });
+    }
+
+    async function init() {
+      await TicketingAuth.renderAuthArea('authArea');
+      const me = await TicketingAuth.fetchMe();
+      const isAdmin = !!(me && me.is_admin);
+      if (isAdmin) {
+        createLinkEl.style.display = 'inline-block';
+      }
+      await renderEvents(me);
+      setInterval(() => renderEvents(me), 30000);
+    }
+
+    init();
+  </script>
+</body>
+</html>
