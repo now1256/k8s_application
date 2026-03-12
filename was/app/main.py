@@ -419,7 +419,7 @@ def create_challenge(
     key = f"ticket:event:{event_id}:seats"
     owner = redis_client.hget(key, seat_id)
     if owner and owner != str(user.id):
-        raise HTTPException(status_code=409, detail="이미 다른 사용자가 선택한 좌석입니다.")
+        raise HTTPException(status_code=409, detail="이미 선택된 좌석입니다.")
 
     captcha_text = "".join(str(random.randint(0, 9)) for _ in range(5))
     challenge_id = secrets.token_urlsafe(12)
@@ -479,9 +479,36 @@ def reserve_seat(
         owner = redis_client.hget(key, seat_id)
         if owner == str(user.id):
             return {"ok": True, "seat_id": seat_id, "message": "이미 내가 선택한 좌석입니다."}
-        raise HTTPException(status_code=409, detail="이미 다른 사용자가 선택한 좌석입니다.")
+        raise HTTPException(status_code=409, detail="이미 선택된 좌석입니다.")
 
     user_key = f"ticket:user:{user.id}:reservations"
     redis_client.sadd(user_key, f"{event_id}:{seat_id}")
 
     return {"ok": True, "seat_id": seat_id, "message": "좌석 선택이 완료되었습니다."}
+
+
+@app.delete("/events/{event_id}/seats/{seat_id}")
+def admin_release_seat(
+    event_id: int,
+    seat_id: str,
+    _: User = Depends(get_current_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    event = db.query(Event).filter(Event.id == event_id).first()
+    if not event:
+        raise HTTPException(status_code=404, detail="이벤트를 찾을 수 없습니다.")
+
+    seat_id = seat_id.upper().strip()
+    if seat_id not in _seat_ids(event):
+        raise HTTPException(status_code=400, detail="유효하지 않은 좌석입니다.")
+
+    seat_key = f"ticket:event:{event_id}:seats"
+    owner = redis_client.hget(seat_key, seat_id)
+    if owner is None:
+        raise HTTPException(status_code=404, detail="선택된 사용자가 없는 좌석입니다.")
+
+    redis_client.hdel(seat_key, seat_id)
+    user_key = f"ticket:user:{owner}:reservations"
+    redis_client.srem(user_key, f"{event_id}:{seat_id}")
+
+    return {"ok": True, "seat_id": seat_id, "message": "좌석 선택이 관리자에 의해 해제되었습니다."}

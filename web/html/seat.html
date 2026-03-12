@@ -347,6 +347,7 @@
 
       closeCaptchaModal();
       setStatus(body.message, 'success');
+      window.alert(`${body.seat_id} 자리 선택하셨습니다.`);
       await loadSeats();
     });
 
