@@ -92,11 +92,9 @@
       text-align: center;
       display: inline-block;
     }
-    .book-btn[aria-disabled="true"] {
+    .book-btn.preopen {
       background: var(--disabled);
       color: #374151;
-      pointer-events: none;
-      cursor: not-allowed;
     }
     .admin-link {
       border: 1px solid var(--line);
@@ -181,15 +179,9 @@
         actions.className = 'actions';
 
         const seatLink = document.createElement('a');
-        seatLink.className = 'book-btn';
-        seatLink.textContent = event.is_open ? '좌석 선택' : '오픈 전';
-        if (event.is_open) {
-          seatLink.href = `/seat.html?eventId=${event.id}`;
-          seatLink.setAttribute('aria-disabled', 'false');
-        } else {
-          seatLink.href = '#';
-          seatLink.setAttribute('aria-disabled', 'true');
-        }
+        seatLink.className = event.is_open ? 'book-btn' : 'book-btn preopen';
+        seatLink.textContent = event.is_open ? '좌석 선택' : '오픈 전(클릭 가능)';
+        seatLink.href = `/seat.html?eventId=${event.id}`;
         actions.appendChild(seatLink);
 
         if (me && me.is_admin) {

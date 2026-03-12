@@ -271,11 +271,10 @@
       titleEl.textContent = `${data.event.name} (${data.event.seat_rows} x ${data.event.seat_cols} 좌석)`;
       seatGridEl.style.gridTemplateColumns = `repeat(${data.event.seat_cols}, minmax(44px, 1fr))`;
 
-      if (!data.event.is_open) {
+      const isOpen = data.event.is_open;
+      if (!isOpen) {
         mySeatsEl.textContent = data.my_seats.length ? data.my_seats.join(', ') : '없음';
-        setStatus('아직 오픈 전입니다.', 'error');
-        seatGridEl.innerHTML = '';
-        return;
+        setStatus('아직 오픈 전입니다. 시간이 되면 선택 가능합니다.', 'error');
       }
 
       mySeatsEl.textContent = data.my_seats.length ? data.my_seats.join(', ') : '없음';
@@ -289,7 +288,8 @@
         if (seat.status === 'occupied') {
           button.classList.add('occupied');
           button.addEventListener('click', () => {
-            setStatus(`${seat.seat_id} 좌석은 이미 다른 사용자가 선택했습니다.`, 'error');
+            setStatus(`${seat.seat_id} 좌석은 이미 선택된 좌석입니다.`, 'error');
+            window.alert('이미 선택된 좌석입니다.');
           });
         } else if (seat.status === 'mine') {
           button.classList.add('mine');
@@ -298,6 +298,12 @@
           });
         } else {
           button.addEventListener('click', async () => {
+            if (!isOpen) {
+              setStatus('아직 오픈 시간이 아닙니다.', 'error');
+              window.alert('아직 오픈 시간이 아닙니다.');
+              return;
+            }
+
             const challengeResponse = await authFetch(`/api/events/${eventId}/challenge`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -342,6 +348,10 @@
       const body = await response.json();
       if (!response.ok) {
         setStatus(body.detail || '좌석 확정에 실패했습니다.', 'error');
+        if (response.status === 409) {
+          window.alert(body.detail || '이미 선택된 좌석입니다.');
+          await loadSeats();
+        }
         return;
       }
 
