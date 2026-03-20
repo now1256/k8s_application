@@ -14,10 +14,17 @@ spec:
     spec:
       containers:
         - name: was
+          # 도메인 주소와 태그 1로 변경
           image: harbor.team1.local/library/ticket-was:1
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          # CPU 리소스 제한 (0.1~0.5 코어)
+          resources:
+            requests:
+              cpu: "100m"
+            limits:
+              cpu: "500m"
           envFrom:
             - secretRef:
                 name: was-secret
